@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 import numpy as np
-import copy 
+import copy # TODO Needed?
 import rospy
 from std_msgs.msg import Int32
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
 from scipy.spatial import KDTree
-from std_msgs.msg import Int32
 
 import math
 
