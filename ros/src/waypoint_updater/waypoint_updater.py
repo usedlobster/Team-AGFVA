@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import numpy as np
+import copy 
 import rospy
+from std_msgs.msg import Int32
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
 from scipy.spatial import KDTree
@@ -26,29 +28,28 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
 MAX_DECEL = .5
 
-
 class WaypointUpdater(object):
     def __init__(self):
         rospy.init_node('waypoint_updater')
-
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
-
-        # TODO-DONE: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
         rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
+        
+        # Add a subscriber for /obstacle_waypoint below
         # rospy.Subscriber('/obstacle_waypoint', Int32, self.traffic_cb) TODO - implement
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
-        # TODO-DONE?: Add other member variables you need below
+        # Other member variables you need below
+        self.base_waypoints = None
         self.pose = None
         self.stopline_wp_idx = -1
-        self.base_waypoints = None
+        self.start_slow_wp_idx = -1 # TODO needed??
         self.waypoints_2d = None
         self.waypoint_tree = None
 
         self.loop()
-
+ 
     def loop(self):
         rate = rospy.Rate(50)
         while not rospy.is_shutdown():
@@ -80,59 +81,74 @@ class WaypointUpdater(object):
 
     def publish_waypoints(self):
         final_lane = self.generate_lane()
-        self.final_waypoints_pub.publish(final_lane)
-
+        #final_lane.header.frame_id = '/world'        # TODO Needed?
+        #final_lane.header.stamp = rospy.Time.now()   # TODO Needed?
+        #final_lane.header.seq = self.msg_seq_num     # TODO Needed?
+        #self.msg_seq_num += 1                        # TODO Needed?
+        self.final_waypoints_pub.publish(final_lane)        
+        
     def generate_lane(self):
       lane = Lane()
 
       closest_idx = self.get_closest_waypoint_idx()
-      farthest_idx = closest_idx + LOOKAHEAD_WPS
-      base_waypoints = self.base_waypoints.waypoints[closest_idx:farthest_idx]
+      far_idx = closest_idx + LOOKAHEAD_WPS
+      #rospy.loginfo_throttle( 1 , self.base_waypoints.waypoints[closest_idx].twist.twist )        
+      next_waypoints = self.base_waypoints.waypoints[closest_idx:far_idx] 
 
-      if self.stopline_wp_idx == -1 or (self.stopline_wp_idx >= farthest_idx):
-        lane.waypoints = base_waypoints
+      if self.stopline_wp_idx == -1 or ( self.stopline_wp_idx >= far_idx ):
+          # rospy.loginfo_throttle(1,'normal!')
+          lane.waypoints = next_waypoints 
       else:
-        lane.waypoints = self.decelerate_waypoints(base_waypoints, closest_idx)
+          # rospy.loginfo_throttle(1,'slowing!')
+          lane.waypoints = self.decelerate_waypoints( next_waypoints , closest_idx )
+      return lane  
+ 
+    def decelerate_waypoints( self , waypoints , closest_idx ):
+        # TODO If we have a large list of waypoints we want to reduce/slice this
+        # list so that the processing in this function does not introduce too much
+        # latency     
+        temp = [] 
 
-      return lane 
+        # Three waypoints back from line so front of car stops at line
+        stop_idx =  max( self.stopline_wp_idx - closest_idx - 3 , 0 )  
+    
+        #rospy.loginfo( self.distance( waypoints , 0 , stop_idx ))
+        for i , wp in enumerate( waypoints ) :
+            # lesson to self , dont do p = wp !!!
+            p = Waypoint()
+            p.pose = wp.pose 
 
-    def decelerate_waypoints(self, waypoints, closes_idx):
-      # TODO If we have a large list of waypoints we want to reduce/slice this
-      # list so that the processing in this function does not introduce too much
-      # latency 
-      temp = []
-      for i, wp in enumerate(waypoints):
+            dist = self.distance( waypoints , i , stop_idx )
+            # vel = math.sqrt(2 * MAX_DECEL * dist)  # TODO adapt to linear or s-shaped curve to make breaking more comfortable
+            vel = math.sqrt( 2 * dist )
+            if ( vel < 1.0 ) :
+                vel =0.0 
+     
+            # dont exceed original waypoint velocity 
+            p.twist.twist.linear.x = max( 0 , min( vel , wp.twist.twist.linear.x ))            
+            p.twist.twist.angular.z = 0.0   # TODO needed??
 
-        p = Waypoint()
-        p.pose = wp.pose
+            temp.append( p ) 
 
-        stop_idx = max(self.stopline_wp_idx -  closes_idx -2, 0)  # Two waypoints back from line so front of car stops at line
-        dist = self.distance(waypoints, i, stop_idx)
-        vel = math.sqrt(2 * MAX_DECEL * dist)  # TODO adapt to linear or s-shaped curve to make breaking more comfortable
-        if vel < 1:
-          vel = 0
-
-        p.twist.twist.linear.x = min(vel, wp.twist.twist.linear.x)
-        temp.append(p)
-
-      return temp
+        return temp 
 
     def pose_cb(self, msg):
         self.pose = msg
 
-    def waypoints_cb(self, waypoints):
-        self.base_waypoints = waypoints
-        if not self.waypoints_2d:
-            self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in waypoints.waypoints]
-            self.waypoint_tree = KDTree(self.waypoints_2d)
-
+    def waypoints_cb(self, waypoints):  
+        self.waypoints_2d = [[w.pose.pose.position.x, w.pose.pose.position.y] for w in waypoints.waypoints]
+        self.waypoint_tree = KDTree(self.waypoints_2d)
+        self.base_waypoints = waypoints 
+        
     def traffic_cb(self, msg):
-        # TODO-DONE: Callback for /traffic_waypoint message. Implement
-        self.stopline_wp_idx = msg.data
+        if ( self.stopline_wp_idx != msg.data ) :
+            # rospy.loginfo( 'stopline @'  + str(msg.data) )
+            self.stopline_wp_idx = msg.data
+            self.start_slow_wp_idx = -1   # TODO Needed?
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
-        pass
+        pass 
 
     def get_waypoint_velocity(self, waypoint):
         return waypoint.twist.twist.linear.x
