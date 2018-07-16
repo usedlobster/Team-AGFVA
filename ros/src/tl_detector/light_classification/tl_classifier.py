@@ -6,7 +6,7 @@ class TLClassifier(object):
     def __init__(self):
         self.threshold = .6
 
-        PATH_TO_MODEL = '../../../training_folder/fine_tuned_model/frozen_inference_graph.pb'
+        PATH_TO_MODEL = '../../../training_folder/fine_tuned_model_sim_200/frozen_inference_graph.pb'
         self.detection_graph = tf.Graph()
         with self.detection_graph.as_default():
             od_graph_def = tf.GraphDef()
@@ -24,9 +24,9 @@ class TLClassifier(object):
 
         # TODO: This is just a guess. Values have to be reviewed after training
         self.tl_mapping = {
-            0 : TrafficLight.RED,
-            1 : TrafficLight.YELLOW,
-            2 : TrafficLight.GREEN
+            1 : TrafficLight.GREEN,
+            2 : TrafficLight.RED,
+            3 : TrafficLight.YELLOW
         }
 
     def get_classification(self, image):
@@ -40,10 +40,9 @@ class TLClassifier(object):
         with self.detection_graph.as_default():
             # Expand dimension since the model expects image to have shape [1, None, None, 3].
             img_expanded = np.expand_dims(image, axis=0)  
-            (boxes, scores, classes, num) = self.sess.run(
+            (_, scores, classes, num) = self.sess.run(
                 [self.d_boxes, self.d_scores, self.d_classes, self.num_d],
                 feed_dict={self.image_tensor: img_expanded})
-        #return boxes, scores, classes, num
         
         if num == 0:
             # No bounding boxes found
