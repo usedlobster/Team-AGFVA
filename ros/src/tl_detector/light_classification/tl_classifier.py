@@ -6,7 +6,7 @@ class TLClassifier(object):
     def __init__(self):
         self.threshold = .6
 
-        PATH_TO_MODEL = '../../../../training_folder/fine_tuned_model_sim_200/frozen_inference_graph.pb'
+        PATH_TO_MODEL = '../../../training_folder/fine_tuned_model_sim_200/frozen_inference_graph.pb'
         self.detection_graph = tf.Graph()
         with self.detection_graph.as_default():
             od_graph_def = tf.GraphDef()
