@@ -4,7 +4,7 @@ from styx_msgs.msg import TrafficLight
 
 class TLClassifier(object):
     def __init__(self):
-        self.threshold = .6
+        self.threshold = .01
 
         PATH_TO_MODEL = '../../../training_folder/fine_tuned_model_sim_200/frozen_inference_graph.pb'
         self.detection_graph = tf.Graph()
@@ -48,9 +48,10 @@ class TLClassifier(object):
             # No bounding boxes found
             return TrafficLight.UNKNOWN
         
-        max_score = scores[0]
-        prediction = classes[0]
-
+        max_score = scores[0][0]
+        prediction = classes[0][0]
+        print("max_score: {}, prediction: {}".format(max_score, prediction))
+        
         if max_score > self.threshold and prediction >= 0 and prediction <= 2:
             return self.tl_mapping[prediction]
         
