@@ -46,11 +46,15 @@ import json
 import os
 import tensorflow as tf
 
-from object_detection.legacy import trainer
-from object_detection.builders import dataset_builder
-from object_detection.builders import graph_rewriter_builder
+from google.protobuf import text_format
+
+from object_detection import trainer
+from object_detection.builders import input_reader_builder
 from object_detection.builders import model_builder
-from object_detection.utils import config_util
+from object_detection.protos import input_reader_pb2
+from object_detection.protos import model_pb2
+from object_detection.protos import pipeline_pb2
+from object_detection.protos import train_pb2
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -84,42 +88,69 @@ flags.DEFINE_string('model_config_path', '',
 FLAGS = flags.FLAGS
 
 
+def get_configs_from_pipeline_file():
+  """Reads training configuration from a pipeline_pb2.TrainEvalPipelineConfig.
+
+  Reads training config from file specified by pipeline_config_path flag.
+
+  Returns:
+    model_config: model_pb2.DetectionModel
+    train_config: train_pb2.TrainConfig
+    input_config: input_reader_pb2.InputReader
+  """
+  pipeline_config = pipeline_pb2.TrainEvalPipelineConfig()
+  with tf.gfile.GFile(FLAGS.pipeline_config_path, 'r') as f:
+    text_format.Merge(f.read(), pipeline_config)
+
+  model_config = pipeline_config.model
+  train_config = pipeline_config.train_config
+  input_config = pipeline_config.train_input_reader
+
+  return model_config, train_config, input_config
+
+
+def get_configs_from_multiple_files():
+  """Reads training configuration from multiple config files.
+
+  Reads the training config from the following files:
+    model_config: Read from --model_config_path
+    train_config: Read from --train_config_path
+    input_config: Read from --input_config_path
+
+  Returns:
+    model_config: model_pb2.DetectionModel
+    train_config: train_pb2.TrainConfig
+    input_config: input_reader_pb2.InputReader
+  """
+  train_config = train_pb2.TrainConfig()
+  with tf.gfile.GFile(FLAGS.train_config_path, 'r') as f:
+    text_format.Merge(f.read(), train_config)
+
+  model_config = model_pb2.DetectionModel()
+  with tf.gfile.GFile(FLAGS.model_config_path, 'r') as f:
+    text_format.Merge(f.read(), model_config)
+
+  input_config = input_reader_pb2.InputReader()
+  with tf.gfile.GFile(FLAGS.input_config_path, 'r') as f:
+    text_format.Merge(f.read(), input_config)
+
+  return model_config, train_config, input_config
+
+
 def main(_):
   assert FLAGS.train_dir, '`train_dir` is missing.'
-  if FLAGS.task == 0: tf.gfile.MakeDirs(FLAGS.train_dir)
   if FLAGS.pipeline_config_path:
-    configs = config_util.get_configs_from_pipeline_file(
-        FLAGS.pipeline_config_path)
-    if FLAGS.task == 0:
-      tf.gfile.Copy(FLAGS.pipeline_config_path,
-                    os.path.join(FLAGS.train_dir, 'pipeline.config'),
-                    overwrite=True)
+    model_config, train_config, input_config = get_configs_from_pipeline_file()
   else:
-    configs = config_util.get_configs_from_multiple_files(
-        model_config_path=FLAGS.model_config_path,
-        train_config_path=FLAGS.train_config_path,
-        train_input_config_path=FLAGS.input_config_path)
-    if FLAGS.task == 0:
-      for name, config in [('model.config', FLAGS.model_config_path),
-                           ('train.config', FLAGS.train_config_path),
-                           ('input.config', FLAGS.input_config_path)]:
-        tf.gfile.Copy(config, os.path.join(FLAGS.train_dir, name),
-                      overwrite=True)
-
-  model_config = configs['model']
-  train_config = configs['train_config']
-  input_config = configs['train_input_config']
+    model_config, train_config, input_config = get_configs_from_multiple_files()
 
   model_fn = functools.partial(
       model_builder.build,
       model_config=model_config,
       is_training=True)
 
-  def get_next(config):
-    return dataset_builder.make_initializable_iterator(
-        dataset_builder.build(config)).get_next()
-
-  create_input_dict_fn = functools.partial(get_next, input_config)
+  create_input_dict_fn = functools.partial(
+      input_reader_builder.build, input_config)
 
   env = json.loads(os.environ.get('TF_CONFIG', '{}'))
   cluster_data = env.get('cluster', None)
@@ -158,25 +189,9 @@ def main(_):
     is_chief = (task_info.type == 'master')
     master = server.target
 
-  graph_rewriter_fn = None
-  if 'graph_rewriter_config' in configs:
-    graph_rewriter_fn = graph_rewriter_builder.build(
-        configs['graph_rewriter_config'], is_training=True)
-
-  trainer.train(
-      create_input_dict_fn,
-      model_fn,
-      train_config,
-      master,
-      task,
-      FLAGS.num_clones,
-      worker_replicas,
-      FLAGS.clone_on_cpu,
-      ps_tasks,
-      worker_job_name,
-      is_chief,
-      FLAGS.train_dir,
-      graph_hook_fn=graph_rewriter_fn)
+  trainer.train(create_input_dict_fn, model_fn, train_config, master, task,
+                FLAGS.num_clones, worker_replicas, FLAGS.clone_on_cpu, ps_tasks,
+                worker_job_name, is_chief, FLAGS.train_dir)
 
 
 if __name__ == '__main__':
