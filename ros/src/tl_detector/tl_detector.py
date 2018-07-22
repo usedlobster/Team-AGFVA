@@ -24,6 +24,7 @@ class TLDetector(object):
         self.lights = []
         self.waypoints_2d = None
         self.waypoint_tree = None
+        self.has_image = False
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -87,6 +88,16 @@ class TLDetector(object):
     def traffic_cb(self, msg):
         self.lights = msg.lights
 
+    def readable_state(self, state):
+        if state == TrafficLight.RED:
+            return "RED"
+        elif state == TrafficLight.YELLOW:
+            return "YELLOW"
+        elif state == TrafficLight.GREEN:
+            return "GREEN"
+        else:
+            return "UNKNOWN"
+
     def image_cb(self, msg):
         """Identifies red lights in the incoming camera image and publishes the index
             of the waypoint closest to the red light's stop line to /traffic_waypoint
@@ -98,7 +109,7 @@ class TLDetector(object):
         self.has_image = True
         self.camera_image = msg
         light_wp, state = self.process_traffic_lights()
-        rospy.logwarn("Closest light waypoint: {0} \nAnd light state: {1}".format(light_wp, state))
+        rospy.logwarn("Closest light waypoint: {0} Light state: {1}".format(light_wp, self.readable_state(state)))
 
         '''
         Publish upcoming red lights at camera frequency.
