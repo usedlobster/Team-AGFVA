@@ -8,7 +8,7 @@ class TLClassifier(object):
         self.threshold = .01
         self.img = None
 
-        PATH_TO_MODEL = '../../../training_folder/fine_tuned_model_sim_5000/frozen_inference_graph.pb'
+        PATH_TO_MODEL = '../../../live_models/fine_tuned_model_sim_5000/frozen_inference_graph.pb'
  		
         self.detection_graph = tf.Graph()
         with self.detection_graph.as_default():
@@ -24,10 +24,10 @@ class TLClassifier(object):
             self.d_classes = self.detection_graph.get_tensor_by_name('detection_classes:0')
             self.num_d = self.detection_graph.get_tensor_by_name('num_detections:0')
 	# tensor flow can get greedy with gpu memory 
-	# limit to 60% 
+	# limit to 80% 
 	# should be done as rosparam  
 	config = tf.ConfigProto()
-	config.gpu_options.per_process_gpu_memory_fraction = 0.6
+	config.gpu_options.per_process_gpu_memory_fraction = rospy.ros
 
 
         self.sess = tf.Session(config=config,graph=self.detection_graph)
