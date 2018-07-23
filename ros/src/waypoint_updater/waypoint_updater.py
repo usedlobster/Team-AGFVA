@@ -43,7 +43,6 @@ class WaypointUpdater(object):
         self.base_waypoints = None
         self.pose = None
         self.stopline_wp_idx = -1
-        self.start_slow_wp_idx = -1 # TODO needed??
         self.waypoints_2d = None
         self.waypoint_tree = None
 
@@ -80,56 +79,57 @@ class WaypointUpdater(object):
 
     def publish_waypoints(self):
         final_lane = self.generate_lane()
-        #final_lane.header.frame_id = '/world'        # TODO Needed?
-        #final_lane.header.stamp = rospy.Time.now()   # TODO Needed?
-        #final_lane.header.seq = self.msg_seq_num     # TODO Needed?
-        #self.msg_seq_num += 1                        # TODO Needed?
         self.final_waypoints_pub.publish(final_lane)        
-        
+     
     def generate_lane(self):
-      lane = Lane()
 
-      closest_idx = self.get_closest_waypoint_idx()
-      far_idx = closest_idx + LOOKAHEAD_WPS
-      #rospy.loginfo_throttle( 1 , self.base_waypoints.waypoints[closest_idx].twist.twist )        
-      next_waypoints = self.base_waypoints.waypoints[closest_idx:far_idx] 
+        lane = Lane()  
 
-      if self.stopline_wp_idx == -1 or ( self.stopline_wp_idx >= far_idx ):
-          # rospy.loginfo_throttle(1,'normal!')
-          lane.waypoints = next_waypoints 
-      else:
-          # rospy.loginfo_throttle(1,'slowing!')
-          lane.waypoints = self.decelerate_waypoints( next_waypoints , closest_idx )
-      return lane  
+        closest_idx = self.get_closest_waypoint_idx()
+
+        far_idx = closest_idx + LOOKAHEAD_WPS
+        next_waypoints = self.base_waypoints.waypoints[closest_idx:far_idx] 
+
+        if self.stopline_wp_idx == -1 or ( self.stopline_wp_idx >= far_idx ):
+            lane.waypoints = next_waypoints 
+        else:
+            lane.waypoints = self.slow_to_stopline( next_waypoints , closest_idx , self.stopline_wp_idx - 3  )
+        
+        return lane 
+
  
-    def decelerate_waypoints( self , waypoints , closest_idx ):
-        # TODO If we have a large list of waypoints we want to reduce/slice this
-        # list so that the processing in this function does not introduce too much
-        # latency     
+    def slow_to_stopline( self , waypoints , closest_idx , stopline_idx  ) :
+
+
         temp = [] 
 
-        # Three waypoints back from line so front of car stops at line
-        stop_idx =  max( self.stopline_wp_idx - closest_idx - 3 , 0 )  
-    
-        #rospy.loginfo( self.distance( waypoints , 0 , stop_idx ))
         for i , wp in enumerate( waypoints ) :
             # lesson to self , dont do p = wp !!!
             p = Waypoint()
             p.pose = wp.pose 
+          
+            j = i + closest_idx 
 
-            dist = self.distance( waypoints , i , stop_idx )
-            # vel = math.sqrt(2 * MAX_DECEL * dist)  # TODO adapt to linear or s-shaped curve to make breaking more comfortable
-            vel = math.sqrt( 2 * dist )
-            if ( vel < 1.0 ) :
-                vel =0.0 
-     
-            # dont exceed original waypoint velocity 
-            p.twist.twist.linear.x = max( 0 , min( vel , wp.twist.twist.linear.x ))            
-            p.twist.twist.angular.z = 0.0   # TODO needed??
+            vel = wp.twist.twist.linear.x 
+
+            if j > stopline_idx-2 :
+                vel = 0.0 
+            elif  j >= stopline_idx - 15 :
+                vel = min(vel ,  math.sqrt( 2.0 * self.distance( waypoints , i  , stopline_idx - closest_idx ))) 
+            elif j > stopline_idx - 25 :
+                vel = vel*0.30
+            elif j > stopline_idx - 35 :
+                vel = vel*0.80
+
+            
+            #
+            p.twist.twist.linear.x  = vel          
+            p.twist.twist.angular.z = 0.0 
 
             temp.append( p ) 
 
         return temp 
+
 
     def pose_cb(self, msg):
         self.pose = msg
