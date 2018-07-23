@@ -1,6 +1,7 @@
 import tensorflow as tf
 import cv2
 import numpy as np
+import rospy
 from styx_msgs.msg import TrafficLight
 
 class TLClassifier(object):
@@ -8,10 +9,10 @@ class TLClassifier(object):
         self.threshold = .01
         self.img = None
 
-        self.sim = flase if rospy.get_param('~fuel_capacity', -1 ) > 0 else true 
-        if self.sim : 
+        self.sim = False if rospy.get_param('~fuel_capacity', -1 ) > 0 else True 
+        if self.sim: 
             PATH_TO_MODEL = '../../../live_models/fine_tuned_model_sim_5000/frozen_inference_graph.pb'
- 		else 
+        else: 
             PATH_TO_MODEL = '../../../live_models/fine_tuned_model_real_5000/frozen_inference_graph.pb'
             
         self.detection_graph = tf.Graph()
@@ -27,11 +28,11 @@ class TLClassifier(object):
             self.d_scores = self.detection_graph.get_tensor_by_name('detection_scores:0')
             self.d_classes = self.detection_graph.get_tensor_by_name('detection_classes:0')
             self.num_d = self.detection_graph.get_tensor_by_name('num_detections:0')
-	# tensor flow can get greedy with gpu memory 
-	# limit to 80% 
-	# should be done as rosparam  
-	config = tf.ConfigProto()
-	config.gpu_options.per_process_gpu_memory_fraction = 0.8 
+            # tensor flow can get greedy with gpu memory 
+            # limit to 80% 
+            # should be done as rosparam  
+            config = tf.ConfigProto()
+            config.gpu_options.per_process_gpu_memory_fraction = 0.8 
 
 
         self.sess = tf.Session(config=config,graph=self.detection_graph)
