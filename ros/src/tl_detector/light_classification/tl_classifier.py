@@ -27,7 +27,7 @@ class TLClassifier(object):
 	# limit to 80% 
 	# should be done as rosparam  
 	config = tf.ConfigProto()
-	config.gpu_options.per_process_gpu_memory_fraction = rospy.ros
+	config.gpu_options.per_process_gpu_memory_fraction = 0.8 
 
 
         self.sess = tf.Session(config=config,graph=self.detection_graph)
