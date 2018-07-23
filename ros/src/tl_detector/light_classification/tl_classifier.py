@@ -1,10 +1,12 @@
 import tensorflow as tf
+import cv2
 import numpy as np
 from styx_msgs.msg import TrafficLight
 
 class TLClassifier(object):
     def __init__(self):
         self.threshold = .01
+        self.img = None
 
         PATH_TO_MODEL = '../../../training_folder/fine_tuned_model_sim_200/frozen_inference_graph.pb'
         self.detection_graph = tf.Graph()
@@ -36,23 +38,53 @@ class TLClassifier(object):
         Returns:
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
         """
+        tl_state = TrafficLight.UNKNOWN
+
         # Bounding Box Detection.
         with self.detection_graph.as_default():
             # Expand dimension since the model expects image to have shape [1, None, None, 3].
             img_expanded = np.expand_dims(image, axis=0)  
-            (_, scores, classes, num) = self.sess.run(
+            (boxes, scores, classes, num) = self.sess.run(
                 [self.d_boxes, self.d_scores, self.d_classes, self.num_d],
                 feed_dict={self.image_tensor: img_expanded})
         
+        # return boxes, scores, classes, num
         if num == 0:
             # No bounding boxes found
-            return TrafficLight.UNKNOWN
+            tl_state = TrafficLight.UNKNOWN
         
-        max_score = scores[0][0]
-        prediction = classes[0][0]
+        max_score = scores[0][0] 
+        prediction = classes[0][0] 
         print("max_score: {}, prediction: {}".format(max_score, prediction))
+
+        ## ---------------------------------------------------------------------
+        # Code for debugging TODO remove or comment later
+        for box, score, clas in zip(boxes[0], scores[0], classes[0]):
+            if score > self.threshold:
+                print "Score: ", score, "Class: ", clas, "Box: ", ["{0:.2f}".format(b) for b in box]
+                # cv2.rectangle(image, (box[0],box[1]),(box[2],box[3]),(255,0,0),3)
         
+        # cv2.rectangle(image, (4,4),(200,200),(255,0,0),3)
+        (rows,cols,channels) = image.shape
+        print rows, cols, channels
+        # cv2.imshow("name", cv_image)
+        # cv2.waitKey(3)
+        cv2.imwrite("test.jpg", image)
+
+        # if self.img is None:
+        #     self.img = pl.imshow(image)
+        # else:
+        #     self.img.set_data(image)
+        #     pl.pause(.1)
+        #     pl.draw()
+
+        ## ---------------------------------------------------------------------
+        
+
+
+
         if max_score > self.threshold and prediction >= 0 and prediction <= 2:
-            return self.tl_mapping[prediction]
+            tl_state = self.tl_mapping[int(prediction)]
         
-        return TrafficLight.UNKNOWN
+        print("STATE: %s", tl_state)
+        return tl_state 
