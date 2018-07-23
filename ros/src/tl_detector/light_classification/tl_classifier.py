@@ -8,8 +8,12 @@ class TLClassifier(object):
         self.threshold = .01
         self.img = None
 
-        PATH_TO_MODEL = '../../../live_models/fine_tuned_model_sim_5000/frozen_inference_graph.pb'
- 		
+        self.sim = flase if rospy.get_param('~fuel_capacity', -1 ) > 0 else true 
+        if self.sim : 
+            PATH_TO_MODEL = '../../../live_models/fine_tuned_model_sim_5000/frozen_inference_graph.pb'
+ 		else 
+            PATH_TO_MODEL = '../../../live_models/fine_tuned_model_real_5000/frozen_inference_graph.pb'
+            
         self.detection_graph = tf.Graph()
         with self.detection_graph.as_default():
             od_graph_def = tf.GraphDef()
