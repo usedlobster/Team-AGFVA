@@ -8,7 +8,8 @@ class TLClassifier(object):
         self.threshold = .01
         self.img = None
 
-        PATH_TO_MODEL = '../../../training_folder/fine_tuned_model_sim_200/frozen_inference_graph.pb'
+        PATH_TO_MODEL = '../../../training_folder/fine_tuned_model_sim_5000/frozen_inference_graph.pb'
+ 		
         self.detection_graph = tf.Graph()
         with self.detection_graph.as_default():
             od_graph_def = tf.GraphDef()
@@ -22,7 +23,14 @@ class TLClassifier(object):
             self.d_scores = self.detection_graph.get_tensor_by_name('detection_scores:0')
             self.d_classes = self.detection_graph.get_tensor_by_name('detection_classes:0')
             self.num_d = self.detection_graph.get_tensor_by_name('num_detections:0')
-        self.sess = tf.Session(graph=self.detection_graph)
+	# tensor flow can get greedy with gpu memory 
+	# limit to 60% 
+	# should be done as rosparam  
+	config = tf.ConfigProto()
+	config.gpu_options.per_process_gpu_memory_fraction = 0.6
+
+
+        self.sess = tf.Session(config=config,graph=self.detection_graph)
 
         # TODO: This is just a guess. Values have to be reviewed after training
         self.tl_mapping = {
