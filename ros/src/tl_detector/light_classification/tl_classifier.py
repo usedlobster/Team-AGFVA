@@ -77,7 +77,7 @@ class TLClassifier(object):
         print rows, cols, channels
         # cv2.imshow("name", cv_image)
         # cv2.waitKey(3)
-        cv2.imwrite("test.jpg", image)
+        #cv2.imwrite("test.jpg", image)
 
         # if self.img is None:
         #     self.img = pl.imshow(image)
