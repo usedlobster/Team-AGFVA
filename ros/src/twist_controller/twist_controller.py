@@ -17,7 +17,7 @@ class Controller(object):
         ki = 0.1
         kd = 0.
         mn = 0.  # Minimum throttle value
-        mx = 0.2 # Maximum throttle value
+        mx = 0.25 # Maximum throttle value
         self.throttle_controller = PID(kp, ki, kd, mn, mx)
 
         tau = 0.5 # 1/(2pi*tau) = cutoff frequency
@@ -58,7 +58,7 @@ class Controller(object):
         throttle = self.throttle_controller.step(vel_error, sample_time)
         brake = 0
 
-        if linear_vel == 0. and current_vel < 0.1:
+        if linear_vel < 0.05 and current_vel < 0.1:
             throttle = 0
             brake = 700 # N*m - to hold the car in place if we are stopped at a light. Acceleration ~ 1m/s^2
         
