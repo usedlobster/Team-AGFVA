@@ -109,7 +109,7 @@ class TLDetector(object):
         self.has_image = True
         self.camera_image = msg
         light_wp, state = self.process_traffic_lights()
-        rospy.logwarn("Closest light waypoint: {0} Light state: {1}".format(light_wp, self.readable_state(state)))
+        rospy.logwarn_throttle(1.0,"Closest light waypoint: {0} Light state: {1}".format(light_wp, self.readable_state(state)))
 
         '''
         Publish upcoming red lights at camera frequency.
