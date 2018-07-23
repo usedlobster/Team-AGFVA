@@ -24,6 +24,7 @@ class TLDetector(object):
         self.lights = []
         self.waypoints_2d = None
         self.waypoint_tree = None
+        self.has_image = False
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -64,18 +65,18 @@ class TLDetector(object):
         # of the camera enabled. 
         # TODO Remove later on
       
-        light_wp, state = self.process_traffic_lights()
-        if self.state != state:
-            self.state_count = 0
-            self.state = state
-        elif self.state_count >= STATE_COUNT_THRESHOLD:
-            self.last_state = self.state
-            light_wp = light_wp if state == TrafficLight.RED else -1
-            self.last_wp = light_wp
-            self.upcoming_red_light_pub.publish(Int32(light_wp))
-        else:
-            self.upcoming_red_light_pub.publish(Int32(self.last_wp))
-        self.state_count += 1
+        # light_wp, state = self.process_traffic_lights()
+        # if self.state != state:
+        #     self.state_count = 0
+        #     self.state = state
+        # elif self.state_count >= STATE_COUNT_THRESHOLD:
+        #     self.last_state = self.state
+        #     light_wp = light_wp if state == TrafficLight.RED else -1
+        #     self.last_wp = light_wp
+        #     self.upcoming_red_light_pub.publish(Int32(light_wp))
+        # else:
+        #     self.upcoming_red_light_pub.publish(Int32(self.last_wp))
+        # self.state_count += 1
         #-----------------------------------------------------------------------
 
     def waypoints_cb(self, waypoints):
@@ -86,6 +87,16 @@ class TLDetector(object):
 
     def traffic_cb(self, msg):
         self.lights = msg.lights
+
+    def readable_state(self, state):
+        if state == TrafficLight.RED:
+            return "RED"
+        elif state == TrafficLight.YELLOW:
+            return "YELLOW"
+        elif state == TrafficLight.GREEN:
+            return "GREEN"
+        else:
+            return "UNKNOWN"
 
     def image_cb(self, msg):
         """Identifies red lights in the incoming camera image and publishes the index
@@ -98,7 +109,7 @@ class TLDetector(object):
         self.has_image = True
         self.camera_image = msg
         light_wp, state = self.process_traffic_lights()
-        #rospy.logwarn("Closest light waypoint: {0} \nAnd light state: {1}".format(light_wp, state))
+        rospy.logwarn("Closest light waypoint: {0} Light state: {1}".format(light_wp, self.readable_state(state)))
 
         '''
         Publish upcoming red lights at camera frequency.
@@ -144,17 +155,17 @@ class TLDetector(object):
         #-----------------------------------------------------------------------
         # For testing just return the light state 
         # TODO REMOVE later on and use the code below or similar
-        return light.state
+        #return light.state
         #-----------------------------------------------------------------------
 
-        # if(not self.has_image):
-        #     self.prev_light_loc = None
-        #     return False
-
-        # cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-
-        # #Get classification
-        # return self.light_classifier.get_classification(cv_image)
+        if not self.has_image:
+            self.prev_light_loc = None
+            return False
+        
+        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+        
+        # Get classification
+        return self.light_classifier.get_classification(cv_image)
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
