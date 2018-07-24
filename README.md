@@ -1,11 +1,13 @@
 # Udacity Self-Driving Car Nanodegree: Programming a Real Self-Driving Car
 
 ### Team Members
-* Wooster Dennis ( Team Lead ) 
-* Stefan Heyer 
-* Markus Mainberger
-* Xue Fei
-* Pascal Irminger 
+| Name | Account |
+| ----- | ------ |
+| Wooster Dennis ( Lead ) | usedlobster@gmail.com | 
+| Stefan Heyer | sheyer@live.com | 
+| Markus Mainberger | markus.mainberger@gmail.com |
+| Xue Fei | alan.xuefei@googlemail.com |
+| Pascal Irminger | pascal.irminger@gmail.com |
 
 ### Used resources:
 * Step by Step TensorFlow Object Detection API Tutorial:
